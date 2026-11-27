@@ -4,6 +4,7 @@ class Destination {
     required this.id,
     required this.name,
     required this.category,
+    this.regency = '',
     required this.district,
     required this.address,
     required this.description,
@@ -23,6 +24,7 @@ class Destination {
   final String id;
   final String name;
   final String category;
+  final String regency;
   final String district;
   final String address;
   final String description;
@@ -44,11 +46,14 @@ class Destination {
         ? rawFacilities.map((item) => item.toString()).toList()
         : const <String>[];
 
+    final parsedRegency = (json['regency'] ?? json['district'] ?? '').toString();
+
     return Destination(
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       category: (json['category'] ?? '').toString(),
-      district: (json['district'] ?? '').toString(),
+      regency: parsedRegency,
+      district: (json['district'] ?? parsedRegency).toString(),
       address: (json['address'] ?? '').toString(),
       description: (json['description'] ?? '').toString(),
       ticketPrice: (json['ticket_price'] as num?)?.toInt() ?? 0,

@@ -35,7 +35,7 @@ class WisataDaerahApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Direktori Wisata Daerah',
+      title: 'Jelajah Wisata Lampung',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: initError != null
