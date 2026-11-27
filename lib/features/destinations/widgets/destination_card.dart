@@ -116,7 +116,7 @@ class DestinationCard extends StatelessWidget {
                           ],
                         ),
                         child: Text(
-                          Formatters.formatRupiah(destination.ticketPrice),
+                          formatTicketPrice(destination.ticketPrice),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,

@@ -11,7 +11,7 @@ class DestinationDetailScreen extends StatelessWidget {
   final Destination destination;
 
   Future<void> _openMaps(BuildContext context) async {
-    final launched = await MapsLauncher.openDestinationMap(destination);
+    final launched = await openInGoogleMaps(destination);
     if (!launched && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -179,7 +179,7 @@ class DestinationDetailScreen extends StatelessWidget {
                           icon: Icons.confirmation_number_rounded,
                           iconColor: const Color(0xFF059669),
                           label: 'Harga Tiket',
-                          value: Formatters.formatRupiah(
+                          value: formatTicketPrice(
                             destination.ticketPrice,
                           ),
                           subtitle: destination.ticketNotes,
