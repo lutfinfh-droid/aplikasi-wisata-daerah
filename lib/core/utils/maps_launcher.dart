@@ -3,11 +3,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../features/destinations/models/destination.dart';
 
 /// Membangun URI Google Maps dengan prioritas:
-/// 1. `googleMapsUrl` jika tersedia dan valid
+/// 1. `mapsUrl` / `googleMapsUrl` jika tersedia dan valid
 /// 2. Koordinat `latitude` & `longitude`
-/// 3. Fallback pencarian nama destinasi + alamat
+/// 3. Fallback pencarian nama destinasi + kabupaten + Lampung
 Uri buildGoogleMapsUri(Destination destination) {
-  final customUrl = destination.googleMapsUrl?.trim();
+  final customUrl = destination.effectiveMapsUrl?.trim();
   if (customUrl != null && customUrl.isNotEmpty) {
     final parsed = Uri.tryParse(customUrl);
     if (parsed != null && parsed.hasScheme) {
@@ -23,9 +23,8 @@ Uri buildGoogleMapsUri(Destination destination) {
     );
   }
 
-  final query = Uri.encodeComponent(
-    '${destination.name}, ${destination.address}',
-  );
+  final queryText = '${destination.name}, ${destination.regency}, Lampung';
+  final query = Uri.encodeComponent(queryText);
   return Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
 }
 

@@ -14,11 +14,31 @@ class DestinationCard extends StatelessWidget {
   final Destination destination;
   final VoidCallback onTap;
 
+  Color _categoryColor(String category) {
+    switch (category) {
+      case 'Pantai':
+      case 'Bahari':
+        return const Color(0xFF0284C7); // Sky blue
+      case 'Air Terjun':
+        return const Color(0xFF0D9488); // Teal
+      case 'Gunung & Bukit':
+        return const Color(0xFF15803D); // Green
+      case 'Taman & Edukasi':
+        return const Color(0xFF4F46E5); // Indigo
+      case 'Budaya & Sejarah':
+        return const Color(0xFFD97706); // Amber
+      case 'Kuliner & Kota':
+        return const Color(0xFFE11D48); // Rose
+      default:
+        return const Color(0xFF0F766E);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final regencyText = destination.regency.trim().isNotEmpty
         ? destination.regency.trim()
-        : destination.district.trim();
+        : (destination.district?.trim() ?? 'Lampung');
     final visibleFacilities = destination.facilities.take(3).toList();
     final extraFacilities =
         destination.facilities.length - visibleFacilities.length;
@@ -53,19 +73,20 @@ class DestinationCard extends StatelessWidget {
                     SmartDestinationImage(
                       imageUrl: destination.imageUrl,
                       destinationName: destination.name,
+                      regency: regencyText,
                       fit: BoxFit.cover,
                     ),
-                    // Overlay gradasi gelap tipis di bawah agar badge kontras
+                    // Gradasi lembut di bagian bawah foto
                     DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Colors.black.withValues(alpha: 0.05),
-                            Colors.black.withValues(alpha: 0.55),
+                            Colors.black.withValues(alpha: 0.1),
+                            Colors.black.withValues(alpha: 0.6),
                           ],
-                          stops: const [0.45, 1.0],
+                          stops: const [0.4, 1.0],
                         ),
                       ),
                     ),
@@ -80,7 +101,8 @@ class DestinationCard extends StatelessWidget {
                             vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.58),
+                            color: _categoryColor(destination.category)
+                                .withValues(alpha: 0.9),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -93,7 +115,7 @@ class DestinationCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                    // Badge harga tiket di kanan bawah
+                    // Badge harga tiket format Rupiah ("Gratis" jika 0) di kanan bawah
                     Positioned(
                       bottom: 12,
                       right: 12,
@@ -109,7 +131,7 @@ class DestinationCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
+                              color: Colors.black.withValues(alpha: 0.25),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             ),
@@ -173,9 +195,7 @@ class DestinationCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
-                            destination.openingHours.isEmpty
-                                ? 'Setiap hari'
-                                : destination.openingHours,
+                            destination.effectiveOpenHours,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

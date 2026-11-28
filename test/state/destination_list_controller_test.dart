@@ -16,69 +16,110 @@ class _FakeDestinationRepository implements DestinationRepository {
     }
     return items;
   }
+
+  @override
+  Future<Destination> createDestination(Destination destination) async {
+    return destination;
+  }
+
+  @override
+  Future<Destination> updateDestination(Destination destination) async {
+    return destination;
+  }
+
+  @override
+  Future<void> deleteDestination(String id) async {}
 }
 
 void main() {
   final sampleItems = [
     const Destination(
       id: '1',
-      name: 'Pantai Melasti',
+      name: 'Pantai Pasir Putih',
+      regency: 'Bandar Lampung',
       category: 'Pantai',
-      district: 'Kec. Kuta Selatan',
-      address: 'Ungasan, Bali',
-      description: 'Pantai tebing kapur.',
-      ticketPrice: 10000,
-      openingHours: '06.00 - 19.00',
-      facilities: ['Parkir'],
-      accessibilityVehicle: 'Motor & Mobil',
-      accessibilityNotes: 'Jalan aspal lebar.',
-      imageUrl: 'https://example.com/1.jpg',
+      ticketPrice: 15000,
+      openHours: '07.00 - 18.00 WIB',
+      facilities: ['Parkir', 'Gazebo'],
+      description: 'Pantai pasir putih indah.',
     ),
     const Destination(
       id: '2',
-      name: 'Museum Angkut',
-      category: 'Edukasi',
-      district: 'Kec. Batu',
-      address: 'Kota Batu, Jawa Timur',
-      description: 'Museum transportasi.',
-      ticketPrice: 100000,
-      openingHours: '12.00 - 20.00',
-      facilities: ['Parkir', 'Toilet'],
-      accessibilityVehicle: 'Motor, Mobil & Bus',
-      accessibilityNotes: 'Akses jalan utama.',
-      imageUrl: 'https://example.com/2.jpg',
+      name: 'Pulau Pahawang',
+      regency: 'Pesawaran',
+      category: 'Bahari',
+      ticketPrice: 30000,
+      openHours: '24 Jam',
+      facilities: ['Snorkeling', 'Perahu'],
+      description: 'Snorkeling terumbu karang.',
+    ),
+    const Destination(
+      id: '3',
+      name: 'Menara Siger',
+      regency: 'Lampung Selatan',
+      category: 'Budaya & Sejarah',
+      ticketPrice: 10000,
+      openHours: '06.00 - 20.00 WIB',
+      facilities: ['Parkir Luas', 'Museum Mini'],
+      description: 'Monumen mahkota Lampung.',
     ),
   ];
 
-  test('memuat destinasi dan memfilter berdasarkan kategori & pencarian',
-      () async {
-    final controller = DestinationListController(
-      repository: _FakeDestinationRepository(items: sampleItems),
-    );
+  group('DestinationListController', () {
+    test('berhasil memuat data destinasi dari repository', () async {
+      final repo = _FakeDestinationRepository(items: sampleItems);
+      final controller = DestinationListController(repository: repo);
 
-    await controller.loadDestinations();
-    expect(controller.filteredDestinations.length, 2);
+      expect(controller.isLoading, isFalse);
+      expect(controller.allDestinations, isEmpty);
 
-    controller.setCategory('Pantai');
-    expect(controller.filteredDestinations.length, 1);
-    expect(controller.filteredDestinations.first.name, 'Pantai Melasti');
+      final future = controller.loadDestinations();
+      expect(controller.isLoading, isTrue);
 
-    controller.setCategory('Semua');
-    controller.setSearchQuery('Batu');
-    expect(controller.filteredDestinations.length, 1);
-    expect(controller.filteredDestinations.first.name, 'Museum Angkut');
+      await future;
+      expect(controller.isLoading, isFalse);
+      expect(controller.allDestinations.length, 3);
+      expect(controller.errorMessage, isNull);
+    });
 
-    controller.resetFilters();
-    expect(controller.filteredDestinations.length, 2);
-  });
+    test('memfilter berdasarkan regency (kabupaten/kota)', () async {
+      final repo = _FakeDestinationRepository(items: sampleItems);
+      final controller = DestinationListController(repository: repo);
+      await controller.loadDestinations();
 
-  test('menangani error repository dengan pesan ramah pengguna', () async {
-    final controller = DestinationListController(
-      repository: _FakeDestinationRepository(shouldThrow: true),
-    );
+      controller.setRegency('Pesawaran');
+      expect(controller.filteredDestinations.length, 1);
+      expect(controller.filteredDestinations.first.name, 'Pulau Pahawang');
 
-    await controller.loadDestinations();
-    expect(controller.errorMessage, isNotNull);
-    expect(controller.allDestinations, isEmpty);
+      controller.setRegency('Semua Wilayah');
+      expect(controller.filteredDestinations.length, 3);
+    });
+
+    test('memfilter berdasarkan pencarian teks dan kategori', () async {
+      final repo = _FakeDestinationRepository(items: sampleItems);
+      final controller = DestinationListController(repository: repo);
+      await controller.loadDestinations();
+
+      controller.setSearchQuery('siger');
+      expect(controller.filteredDestinations.length, 1);
+      expect(controller.filteredDestinations.first.name, 'Menara Siger');
+
+      controller.setSearchQuery('');
+      controller.setCategory('Pantai');
+      expect(controller.filteredDestinations.length, 1);
+      expect(controller.filteredDestinations.first.name, 'Pantai Pasir Putih');
+    });
+
+    test('mengelompokkan destinasi berdasarkan kabupaten saat Semua Wilayah aktif', () async {
+      final repo = _FakeDestinationRepository(items: sampleItems);
+      final controller = DestinationListController(repository: repo);
+      await controller.loadDestinations();
+
+      final grouped = controller.groupedDestinations;
+      expect(grouped.containsKey('Bandar Lampung'), isTrue);
+      expect(grouped.containsKey('Pesawaran'), isTrue);
+      expect(grouped.containsKey('Lampung Selatan'), isTrue);
+      expect(grouped['Bandar Lampung']!.length, 1);
+    });
   });
 }

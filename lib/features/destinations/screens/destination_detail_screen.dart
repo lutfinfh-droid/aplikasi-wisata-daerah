@@ -3,16 +3,37 @@ import 'package:flutter/material.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/maps_launcher.dart';
 import '../models/destination.dart';
+import '../widgets/destination_form_dialog.dart';
 import '../widgets/smart_destination_image.dart';
 
-class DestinationDetailScreen extends StatelessWidget {
-  const DestinationDetailScreen({super.key, required this.destination});
+class DestinationDetailScreen extends StatefulWidget {
+  const DestinationDetailScreen({
+    super.key,
+    required this.destination,
+    this.onUpdate,
+    this.onDelete,
+  });
 
   final Destination destination;
+  final Future<void> Function(Destination destination)? onUpdate;
+  final Future<void> Function(String id)? onDelete;
 
-  Future<void> _openMaps(BuildContext context) async {
-    final launched = await openInGoogleMaps(destination);
-    if (!launched && context.mounted) {
+  @override
+  State<DestinationDetailScreen> createState() => _DestinationDetailScreenState();
+}
+
+class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
+  late Destination _currentDestination;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentDestination = widget.destination;
+  }
+
+  Future<void> _openMaps() async {
+    final launched = await openInGoogleMaps(_currentDestination);
+    if (!launched && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Tidak dapat membuka Google Maps di perangkat ini.'),
@@ -21,12 +42,61 @@ class DestinationDetailScreen extends StatelessWidget {
     }
   }
 
-  void _showReadOnlyNotice(BuildContext context, String actionName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$actionName hanya tersedia untuk admin di Supabase.'),
+  Future<void> _handleEdit() async {
+    await showDialog<bool>(
+      context: context,
+      builder: (_) => DestinationFormDialog(
+        destination: _currentDestination,
+        onSave: (updated) async {
+          if (widget.onUpdate != null) {
+            await widget.onUpdate!(updated);
+          }
+          if (mounted) {
+            setState(() => _currentDestination = updated);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Destinasi berhasil diperbarui')),
+            );
+          }
+        },
       ),
     );
+  }
+
+  Future<void> _handleDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus Destinasi?'),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus "${_currentDestination.name}"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+            ),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      if (widget.onDelete != null) {
+        await widget.onDelete!(_currentDestination.id);
+      }
+      if (mounted) {
+        Navigator.of(context).pop(true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Destinasi berhasil dihapus')),
+        );
+      }
+    }
   }
 
   IconData _facilityIcon(String facility) {
@@ -45,20 +115,26 @@ class DestinationDetailScreen extends StatelessWidget {
       return Icons.restaurant_rounded;
     }
     if (lower.contains('wifi')) return Icons.wifi_rounded;
-    if (lower.contains('penginapan') || lower.contains('hotel')) {
+    if (lower.contains('penginapan') || lower.contains('hotel') || lower.contains('camp')) {
       return Icons.hotel_rounded;
     }
     if (lower.contains('foto') || lower.contains('spot')) {
       return Icons.camera_alt_rounded;
+    }
+    if (lower.contains('perahu') || lower.contains('kano') || lower.contains('snorkeling') || lower.contains('selancar')) {
+      return Icons.sailing_rounded;
+    }
+    if (lower.contains('gazebo') || lower.contains('saung')) {
+      return Icons.deck_rounded;
     }
     return Icons.check_circle_outline_rounded;
   }
 
   @override
   Widget build(BuildContext context) {
-    final regencyText = destination.regency.trim().isNotEmpty
-        ? destination.regency.trim()
-        : destination.district.trim();
+    final regencyText = _currentDestination.regency.trim().isNotEmpty
+        ? _currentDestination.regency.trim()
+        : (_currentDestination.district?.trim() ?? 'Lampung');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -73,13 +149,12 @@ class DestinationDetailScreen extends StatelessWidget {
               IconButton(
                 tooltip: 'Edit Destinasi',
                 icon: const Icon(Icons.edit_outlined),
-                onPressed: () => _showReadOnlyNotice(context, 'Edit destinasi'),
+                onPressed: _handleEdit,
               ),
               IconButton(
                 tooltip: 'Hapus Destinasi',
                 icon: const Icon(Icons.delete_outline_rounded),
-                onPressed: () =>
-                    _showReadOnlyNotice(context, 'Hapus destinasi'),
+                onPressed: _handleDelete,
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
@@ -87,8 +162,9 @@ class DestinationDetailScreen extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   SmartDestinationImage(
-                    imageUrl: destination.imageUrl,
-                    destinationName: destination.name,
+                    imageUrl: _currentDestination.imageUrl,
+                    destinationName: _currentDestination.name,
+                    regency: regencyText,
                     fit: BoxFit.cover,
                   ),
                   DecoratedBox(
@@ -99,13 +175,13 @@ class DestinationDetailScreen extends StatelessWidget {
                         colors: [
                           Colors.black.withValues(alpha: 0.35),
                           Colors.transparent,
-                          Colors.black.withValues(alpha: 0.65),
+                          Colors.black.withValues(alpha: 0.7),
                         ],
                         stops: const [0.0, 0.45, 1.0],
                       ),
                     ),
                   ),
-                  if (destination.category.isNotEmpty)
+                  if (_currentDestination.category.isNotEmpty)
                     Positioned(
                       left: 16,
                       bottom: 16,
@@ -119,7 +195,7 @@ class DestinationDetailScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          destination.category,
+                          _currentDestination.category,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -139,7 +215,7 @@ class DestinationDetailScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    destination.name,
+                    _currentDestination.name,
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
@@ -158,11 +234,10 @@ class DestinationDetailScreen extends StatelessWidget {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          destination.address.isNotEmpty
-                              ? '$regencyText • ${destination.address}'
-                              : regencyText,
+                          '$regencyText, Provinsi Lampung',
                           style: const TextStyle(
                             fontSize: 14,
+                            fontWeight: FontWeight.w600,
                             color: Color(0xFF475569),
                             height: 1.4,
                           ),
@@ -180,9 +255,9 @@ class DestinationDetailScreen extends StatelessWidget {
                           iconColor: const Color(0xFF059669),
                           label: 'Harga Tiket',
                           value: formatTicketPrice(
-                            destination.ticketPrice,
+                            _currentDestination.ticketPrice,
                           ),
-                          subtitle: destination.ticketNotes,
+                          subtitle: _currentDestination.ticketNotes,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -191,9 +266,7 @@ class DestinationDetailScreen extends StatelessWidget {
                           icon: Icons.schedule_rounded,
                           iconColor: const Color(0xFF0F766E),
                           label: 'Jam Operasional',
-                          value: destination.openingHours.isEmpty
-                              ? 'Setiap Hari'
-                              : destination.openingHours,
+                          value: _currentDestination.effectiveOpenHours,
                         ),
                       ),
                     ],
@@ -209,16 +282,16 @@ class DestinationDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    destination.description.isEmpty
-                        ? 'Belum ada deskripsi untuk destinasi ini.'
-                        : destination.description,
+                    _currentDestination.description.isEmpty
+                        ? 'Destinasi wisata unggulan di $regencyText, Provinsi Lampung.'
+                        : _currentDestination.description,
                     style: const TextStyle(
                       fontSize: 14.5,
                       color: Color(0xFF334155),
                       height: 1.6,
                     ),
                   ),
-                  if (destination.facilities.isNotEmpty) ...[
+                  if (_currentDestination.facilities.isNotEmpty) ...[
                     const SizedBox(height: 22),
                     const Text(
                       'Fasilitas Tersedia',
@@ -232,7 +305,7 @@ class DestinationDetailScreen extends StatelessWidget {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: destination.facilities.map((facility) {
+                      children: _currentDestination.facilities.map((facility) {
                         return Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -291,7 +364,7 @@ class DestinationDetailScreen extends StatelessWidget {
           child: SizedBox(
             height: 52,
             child: FilledButton.icon(
-              onPressed: () => _openMaps(context),
+              onPressed: _openMaps,
               icon: const Icon(Icons.directions_rounded),
               label: const Text(
                 'Buka Rute di Google Maps',

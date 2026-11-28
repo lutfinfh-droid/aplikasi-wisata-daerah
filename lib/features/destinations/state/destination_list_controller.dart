@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../data/destination_repository.dart';
 import '../models/destination.dart';
 
-/// Controller state untuk halaman Beranda (daftar, pencarian, dan filter wilayah/kabupaten).
+/// Controller state untuk halaman Beranda Jelajah Wisata Lampung.
 class DestinationListController extends ChangeNotifier {
   DestinationListController({required DestinationRepository repository})
       : _repository = repository;
@@ -12,7 +12,7 @@ class DestinationListController extends ChangeNotifier {
 
   static const String allRegionsLabel = 'Semua Wilayah';
 
-  static const List<String> knownRegencies = [
+  static const List<String> lampungRegencies = [
     'Bandar Lampung',
     'Pesawaran',
     'Lampung Selatan',
@@ -26,16 +26,19 @@ class DestinationListController extends ChangeNotifier {
     'Metro',
     'Lampung Utara',
     'Tulang Bawang',
+    'Tulang Bawang Barat',
     'Mesuji',
   ];
 
-  static const List<String> defaultCategories = [
+  static const List<String> categories = [
     'Semua',
     'Pantai',
-    'Alam/Bukit',
-    'Edukasi',
-    'Kuliner',
-    'Budaya',
+    'Bahari',
+    'Air Terjun',
+    'Gunung & Bukit',
+    'Taman & Edukasi',
+    'Budaya & Sejarah',
+    'Kuliner & Kota',
   ];
 
   List<Destination> _allDestinations = const [];
@@ -52,66 +55,67 @@ class DestinationListController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  String _regencyOf(Destination item) {
-    final value = item.regency.trim().isNotEmpty
-        ? item.regency.trim()
-        : item.district.trim();
-    return value.isEmpty ? 'Lainnya' : value;
+  String _cleanRegency(Destination item) {
+    final reg = item.regency.trim();
+    if (reg.isNotEmpty) return reg;
+    final dist = item.district?.trim() ?? '';
+    return dist.isNotEmpty ? dist : 'Lainnya';
   }
 
-  /// Daftar wilayah yang tersedia di database, diawali "Semua Wilayah".
+  /// Daftar pilihan wilayah horizontal: "Semua Wilayah" lalu 15 Kabupaten/Kota.
   List<String> get availableRegencies {
-    final present = _allDestinations.map(_regencyOf).toSet();
-    final ordered = <String>[allRegionsLabel];
+    final list = <String>[allRegionsLabel];
+    list.addAll(lampungRegencies);
 
-    for (final regency in knownRegencies) {
-      if (present.contains(regency)) {
-        ordered.add(regency);
-      }
-    }
-
-    final extras = present
-        .where((r) => !knownRegencies.contains(r))
+    // Tambahkan regency lain jika ada di database tapi belum masuk lampungRegencies
+    final presentOther = _allDestinations
+        .map(_cleanRegency)
+        .where((r) => !lampungRegencies.contains(r) && r != 'Lainnya')
+        .toSet()
         .toList()
       ..sort();
-    ordered.addAll(extras);
 
-    return ordered;
+    list.addAll(presentOther);
+    return list;
   }
 
   List<Destination> get filteredDestinations {
     final query = _searchQuery.trim().toLowerCase();
     return _allDestinations.where((item) {
-      final regency = _regencyOf(item);
+      final regency = _cleanRegency(item);
+
+      // Filter wilayah
       final matchesRegency =
           _selectedRegency == allRegionsLabel || regency == _selectedRegency;
       if (!matchesRegency) return false;
 
+      // Filter kategori
       final matchesCategory =
           _selectedCategory == 'Semua' || item.category == _selectedCategory;
       if (!matchesCategory) return false;
 
       if (query.isEmpty) return true;
 
+      // Search query mencocokkan nama, kabupaten, kategori, atau deskripsi
       return item.name.toLowerCase().contains(query) ||
           regency.toLowerCase().contains(query) ||
-          item.district.toLowerCase().contains(query) ||
-          item.address.toLowerCase().contains(query);
+          item.category.toLowerCase().contains(query) ||
+          item.description.toLowerCase().contains(query);
     }).toList();
   }
 
-  /// Mengelompokkan destinasi hasil filter berdasarkan Kabupaten/Kota.
+  /// Mengelompokkan destinasi berdasarkan Kabupaten/Kota secara terurut rapi.
   Map<String, List<Destination>> get groupedDestinations {
     final grouped = <String, List<Destination>>{};
     for (final item in filteredDestinations) {
-      final key = _regencyOf(item);
-      grouped.putIfAbsent(key, () => []).add(item);
+      final reg = _cleanRegency(item);
+      grouped.putIfAbsent(reg, () => []).add(item);
     }
 
     final sortedKeys = grouped.keys.toList()
       ..sort((a, b) {
-        final idxA = knownRegencies.indexOf(a);
-        final idxB = knownRegencies.indexOf(b);
+        final idxA = lampungRegencies.indexOf(a);
+        final idxB = lampungRegencies.indexOf(b);
         if (idxA != -1 && idxB != -1) return idxA.compareTo(idxB);
         if (idxA != -1) return -1;
         if (idxB != -1) return 1;
@@ -135,6 +139,27 @@ class DestinationListController extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> addDestination(Destination destination) async {
+    final created = await _repository.createDestination(destination);
+    _allDestinations = [created, ..._allDestinations];
+    notifyListeners();
+  }
+
+  Future<void> updateDestination(Destination destination) async {
+    final updated = await _repository.updateDestination(destination);
+    _allDestinations = _allDestinations
+        .map((item) => item.id == updated.id ? updated : item)
+        .toList();
+    notifyListeners();
+  }
+
+  Future<void> deleteDestination(String id) async {
+    await _repository.deleteDestination(id);
+    _allDestinations =
+        _allDestinations.where((item) => item.id != id).toList();
+    notifyListeners();
   }
 
   void setSearchQuery(String query) {

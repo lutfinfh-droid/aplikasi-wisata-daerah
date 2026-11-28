@@ -3,37 +3,34 @@ import 'package:wisata_daerah/features/destinations/models/destination.dart';
 
 void main() {
   group('Destination.fromJson', () {
-    test('memetakan seluruh field dari Supabase dengan benar', () {
+    test('memetakan seluruh field tabel destinations Supabase dengan benar', () {
       final json = {
-        'id': '123',
-        'name': 'Pantai Tanjung Tinggi',
+        'id': 101,
+        'name': 'Pantai Pasir Putih Lampung',
+        'regency': 'Bandar Lampung',
         'category': 'Pantai',
-        'district': 'Kec. Sijuk',
-        'address': 'Desa Keciput, Kab. Belitung',
-        'description': 'Pantai berbatu granit.',
         'ticket_price': 15000,
-        'ticket_notes': 'Parkir motor Rp 3.000',
-        'opening_hours': '06.00 - 18.00 WIB',
-        'facilities': ['Parkir', 'Toilet', 'Mushola'],
-        'accessibility_vehicle': 'Motor & Mobil',
-        'accessibility_notes': 'Jalan beraspal mulus.',
+        'open_hours': '07.00 - 18.00 WIB',
+        'facilities': ['Parkir', 'Toilet', 'Gazebo', 'Warung Makan'],
+        'description': 'Pantai pasir putih dekat pusat kota.',
         'image_url': 'https://example.com/pantai.jpg',
-        'latitude': -2.5536,
-        'longitude': 107.7097,
-        'google_maps_url': null,
-        'is_active': true,
+        'maps_url': 'https://maps.google.com/?q=Pasir+Putih',
+        'created_at': '2026-11-28T10:00:00.000Z',
       };
 
       final destination = Destination.fromJson(json);
 
-      expect(destination.id, '123');
-      expect(destination.name, 'Pantai Tanjung Tinggi');
+      expect(destination.id, '101');
+      expect(destination.name, 'Pantai Pasir Putih Lampung');
+      expect(destination.regency, 'Bandar Lampung');
+      expect(destination.category, 'Pantai');
       expect(destination.ticketPrice, 15000);
-      expect(destination.facilities, ['Parkir', 'Toilet', 'Mushola']);
-      expect(destination.latitude, -2.5536);
-      expect(destination.longitude, 107.7097);
-      expect(destination.googleMapsUrl, isNull);
-      expect(destination.isActive, isTrue);
+      expect(destination.effectiveOpenHours, '07.00 - 18.00 WIB');
+      expect(destination.facilities, ['Parkir', 'Toilet', 'Gazebo', 'Warung Makan']);
+      expect(destination.description, 'Pantai pasir putih dekat pusat kota.');
+      expect(destination.imageUrl, 'https://example.com/pantai.jpg');
+      expect(destination.effectiveMapsUrl, 'https://maps.google.com/?q=Pasir+Putih');
+      expect(destination.createdAt, isNotNull);
     });
   });
 }

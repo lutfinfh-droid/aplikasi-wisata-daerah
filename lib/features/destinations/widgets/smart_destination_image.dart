@@ -4,20 +4,24 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-/// Widget gambar pintar yang otomatis mencari foto asli dari Wikipedia Indonesia
-/// atau Wikimedia Commons jika `imageUrl` dari database kosong atau gagal dimuat.
+/// Widget gambar cerdas yang memuat foto dari `imageUrl` Supabase.
+/// Jika kosong atau gagal dimuat, widget secara otomatis mencari foto asli tempat
+/// wisata tersebut dari API publik Wikipedia Indonesia atau Wikimedia Commons
+/// dan menampilkannya dengan efek shimmer loading halus dan in-memory cache.
 class SmartDestinationImage extends StatefulWidget {
   const SmartDestinationImage({
     super.key,
     required this.imageUrl,
     required this.destinationName,
+    this.regency = 'Lampung',
     this.fit = BoxFit.cover,
     this.width,
     this.height,
   });
 
-  final String imageUrl;
+  final String? imageUrl;
   final String destinationName;
+  final String regency;
   final BoxFit fit;
   final double? width;
   final double? height;
@@ -52,9 +56,9 @@ class _SmartDestinationImageState extends State<SmartDestinationImage> {
   }
 
   void _initImage() {
-    final trimmed = widget.imageUrl.trim();
-    if (trimmed.isNotEmpty) {
-      _resolvedUrl = trimmed;
+    final rawUrl = widget.imageUrl?.trim() ?? '';
+    if (rawUrl.isNotEmpty) {
+      _resolvedUrl = rawUrl;
       return;
     }
     _fetchFromPublicApi();
@@ -80,7 +84,7 @@ class _SmartDestinationImageState extends State<SmartDestinationImage> {
 
     final future = _inFlightRequests.putIfAbsent(
       key,
-      () => _searchWikipediaAndCommons(widget.destinationName.trim()),
+      () => _searchWikipediaAndCommons(widget.destinationName.trim(), widget.regency),
     );
 
     final url = await future;
@@ -95,16 +99,45 @@ class _SmartDestinationImageState extends State<SmartDestinationImage> {
     }
   }
 
-  static Future<String?> _searchWikipediaAndCommons(String query) async {
-    final encoded = Uri.encodeQueryComponent(query);
-    final wikiUrl =
-        'https://id.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=$encoded&gsrlimit=1&prop=pageimages&pithumbsize=800&format=json';
+  static Future<String?> _searchWikipediaAndCommons(String query, String regency) async {
+    // 1. Coba cari nama wisata langsung di Wikipedia Indonesia
+    var result = await _searchWiki(query);
+    if (result != null && result.isNotEmpty) return result;
 
-    final wikiImage = await _fetchJsonThumbnail(wikiUrl, isCommons: false);
-    if (wikiImage != null && wikiImage.isNotEmpty) {
-      return wikiImage;
+    // Bersihkan nama dari tanda kurung seperti "(Banana Island)" atau "(Krui Surf Spot)"
+    final cleanName = query.replaceAll(RegExp(r'\(.*?\)'), '').trim();
+    if (cleanName != query) {
+      result = await _searchWiki(cleanName);
+      if (result != null && result.isNotEmpty) return result;
     }
 
+    // 2. Coba tambahkan "Lampung"
+    result = await _searchWiki('$cleanName Lampung');
+    if (result != null && result.isNotEmpty) return result;
+
+    // 3. Coba cari di Wikimedia Commons
+    result = await _searchCommons(query);
+    if (result != null && result.isNotEmpty) return result;
+
+    result = await _searchCommons('$cleanName Lampung');
+    if (result != null && result.isNotEmpty) return result;
+
+    // 4. Fallback ke gambar alam Lampung representatif
+    result = await _searchWiki('Teluk Lampung');
+    if (result != null && result.isNotEmpty) return result;
+
+    return null;
+  }
+
+  static Future<String?> _searchWiki(String term) async {
+    final encoded = Uri.encodeQueryComponent(term);
+    final wikiUrl =
+        'https://id.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=$encoded&gsrlimit=1&prop=pageimages&pithumbsize=800&format=json';
+    return _fetchJsonThumbnail(wikiUrl, isCommons: false);
+  }
+
+  static Future<String?> _searchCommons(String term) async {
+    final encoded = Uri.encodeQueryComponent(term);
     final commonsUrl =
         'https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=$encoded&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json';
     return _fetchJsonThumbnail(commonsUrl, isCommons: true);
@@ -120,7 +153,7 @@ class _SmartDestinationImageState extends State<SmartDestinationImage> {
       final request = await client.getUrl(Uri.parse(url));
       request.headers.set(
         HttpHeaders.userAgentHeader,
-        'JelajahWisataLampung/1.0 (Flutter App)',
+        'JelajahWisataLampung/1.0 (Mobile App; contact: wisata@lampung.id)',
       );
       final response = await request.close();
       if (response.statusCode != 200) return null;
@@ -158,7 +191,7 @@ class _SmartDestinationImageState extends State<SmartDestinationImage> {
 
     final url = _resolvedUrl;
     if (url == null || url.isEmpty) {
-      return _FallbackPlaceholder(width: widget.width, height: widget.height);
+      return _NatureFallback(width: widget.width, height: widget.height);
     }
 
     return CachedNetworkImage(
@@ -169,7 +202,7 @@ class _SmartDestinationImageState extends State<SmartDestinationImage> {
       placeholder: (context, _) =>
           _ShimmerPlaceholder(width: widget.width, height: widget.height),
       errorWidget: (context, _, __) {
-        if (!_primaryFailed && widget.imageUrl.trim().isNotEmpty) {
+        if (!_primaryFailed && (widget.imageUrl?.trim().isNotEmpty ?? false)) {
           _primaryFailed = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) _fetchFromPublicApi();
@@ -179,7 +212,7 @@ class _SmartDestinationImageState extends State<SmartDestinationImage> {
             height: widget.height,
           );
         }
-        return _FallbackPlaceholder(
+        return _NatureFallback(
           width: widget.width,
           height: widget.height,
         );
@@ -207,7 +240,7 @@ class _ShimmerPlaceholderState extends State<_ShimmerPlaceholder>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1300),
+      duration: const Duration(milliseconds: 1200),
     )..repeat();
   }
 
@@ -243,8 +276,9 @@ class _ShimmerPlaceholderState extends State<_ShimmerPlaceholder>
   }
 }
 
-class _FallbackPlaceholder extends StatelessWidget {
-  const _FallbackPlaceholder({this.width, this.height});
+/// Fallback elegan bertema alam bernuansa gradasi Teal-Emerald
+class _NatureFallback extends StatelessWidget {
+  const _NatureFallback({this.width, this.height});
 
   final double? width;
   final double? height;
@@ -254,12 +288,29 @@ class _FallbackPlaceholder extends StatelessWidget {
     return Container(
       width: width,
       height: height,
-      color: const Color(0xFFE2E8F0),
-      alignment: Alignment.center,
-      child: const Icon(
-        Icons.landscape_rounded,
-        size: 48,
-        color: Color(0xFF94A3B8),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0F766E),
+            Color(0xFF064E3B),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.nature_people_rounded,
+            size: 32,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }

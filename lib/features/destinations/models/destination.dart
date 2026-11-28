@@ -3,18 +3,22 @@ class Destination {
   const Destination({
     required this.id,
     required this.name,
+    required this.regency,
     required this.category,
-    this.regency = '',
-    required this.district,
-    required this.address,
-    required this.description,
-    required this.ticketPrice,
+    this.ticketPrice = 0,
+    this.openHours = '08.00 - 17.00 WIB',
+    this.facilities = const <String>[],
+    this.description = '',
+    this.imageUrl,
+    this.mapsUrl,
+    this.createdAt,
+    // Kompatibilitas mundur
+    this.district,
+    this.address,
     this.ticketNotes,
-    required this.openingHours,
-    required this.facilities,
-    required this.accessibilityVehicle,
-    required this.accessibilityNotes,
-    required this.imageUrl,
+    this.openingHours,
+    this.accessibilityVehicle,
+    this.accessibilityNotes,
     this.latitude,
     this.longitude,
     this.googleMapsUrl,
@@ -23,22 +27,45 @@ class Destination {
 
   final String id;
   final String name;
-  final String category;
   final String regency;
-  final String district;
-  final String address;
-  final String description;
+  final String category;
   final int ticketPrice;
-  final String? ticketNotes;
-  final String openingHours;
+  final String openHours;
   final List<String> facilities;
-  final String accessibilityVehicle;
-  final String accessibilityNotes;
-  final String imageUrl;
+  final String description;
+  final String? imageUrl;
+  final String? mapsUrl;
+  final DateTime? createdAt;
+
+  // Field getter pendukung kompatibilitas
+  final String? district;
+  final String? address;
+  final String? ticketNotes;
+  final String? openingHours;
+  final String? accessibilityVehicle;
+  final String? accessibilityNotes;
   final double? latitude;
   final double? longitude;
   final String? googleMapsUrl;
   final bool isActive;
+
+  /// Helper untuk mengambil jam buka yang konsisten
+  String get effectiveOpenHours {
+    if (openHours.trim().isNotEmpty) return openHours;
+    if (openingHours != null && openingHours!.trim().isNotEmpty) {
+      return openingHours!;
+    }
+    return '08.00 - 17.00 WIB';
+  }
+
+  /// Helper untuk mengambil URL maps
+  String? get effectiveMapsUrl {
+    if (mapsUrl != null && mapsUrl!.trim().isNotEmpty) return mapsUrl;
+    if (googleMapsUrl != null && googleMapsUrl!.trim().isNotEmpty) {
+      return googleMapsUrl;
+    }
+    return null;
+  }
 
   factory Destination.fromJson(Map<String, dynamic> json) {
     final rawFacilities = json['facilities'];
@@ -47,26 +74,81 @@ class Destination {
         : const <String>[];
 
     final parsedRegency = (json['regency'] ?? json['district'] ?? '').toString();
+    final parsedHours = (json['open_hours'] ?? json['opening_hours'] ?? '08.00 - 17.00 WIB').toString();
+    final parsedMapsUrl = (json['maps_url'] ?? json['google_maps_url'])?.toString();
+    final parsedCreatedAt = json['created_at'] != null
+        ? DateTime.tryParse(json['created_at'].toString())
+        : null;
 
     return Destination(
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
-      category: (json['category'] ?? '').toString(),
       regency: parsedRegency,
-      district: (json['district'] ?? parsedRegency).toString(),
-      address: (json['address'] ?? '').toString(),
-      description: (json['description'] ?? '').toString(),
+      category: (json['category'] ?? '').toString(),
       ticketPrice: (json['ticket_price'] as num?)?.toInt() ?? 0,
-      ticketNotes: json['ticket_notes']?.toString(),
-      openingHours: (json['opening_hours'] ?? '').toString(),
+      openHours: parsedHours,
       facilities: parsedFacilities,
-      accessibilityVehicle: (json['accessibility_vehicle'] ?? '').toString(),
-      accessibilityNotes: (json['accessibility_notes'] ?? '').toString(),
-      imageUrl: (json['image_url'] ?? '').toString(),
+      description: (json['description'] ?? '').toString(),
+      imageUrl: json['image_url']?.toString(),
+      mapsUrl: parsedMapsUrl,
+      createdAt: parsedCreatedAt,
+      // Kompatibilitas
+      district: (json['district'] ?? parsedRegency).toString(),
+      address: json['address']?.toString() ?? parsedRegency,
+      ticketNotes: json['ticket_notes']?.toString(),
+      openingHours: parsedHours,
+      accessibilityVehicle: json['accessibility_vehicle']?.toString() ?? 'Motor & Mobil',
+      accessibilityNotes: json['accessibility_notes']?.toString() ?? '',
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
-      googleMapsUrl: json['google_maps_url']?.toString(),
+      googleMapsUrl: parsedMapsUrl,
       isActive: (json['is_active'] as bool?) ?? true,
+    );
+  }
+
+  Map<String, dynamic> toInsertJson() {
+    return {
+      'name': name.trim(),
+      'regency': regency.trim(),
+      'category': category.trim(),
+      'ticket_price': ticketPrice,
+      'open_hours': openHours.trim(),
+      'facilities': facilities,
+      'description': description.trim(),
+      'image_url': (imageUrl != null && imageUrl!.trim().isNotEmpty) ? imageUrl!.trim() : null,
+      'maps_url': (mapsUrl != null && mapsUrl!.trim().isNotEmpty) ? mapsUrl!.trim() : null,
+    };
+  }
+
+  Map<String, dynamic> toUpdateJson() {
+    return toInsertJson();
+  }
+
+  Destination copyWith({
+    String? id,
+    String? name,
+    String? regency,
+    String? category,
+    int? ticketPrice,
+    String? openHours,
+    List<String>? facilities,
+    String? description,
+    String? imageUrl,
+    String? mapsUrl,
+    DateTime? createdAt,
+  }) {
+    return Destination(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      regency: regency ?? this.regency,
+      category: category ?? this.category,
+      ticketPrice: ticketPrice ?? this.ticketPrice,
+      openHours: openHours ?? this.openHours,
+      facilities: facilities ?? this.facilities,
+      description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
+      mapsUrl: mapsUrl ?? this.mapsUrl,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

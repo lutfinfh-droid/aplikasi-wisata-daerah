@@ -10,20 +10,29 @@ class _FakeRepo implements DestinationRepository {
     return const [
       Destination(
         id: '1',
-        name: 'Pantai Tanjung Tinggi',
+        name: 'Pantai Pasir Putih Lampung',
+        regency: 'Bandar Lampung',
         category: 'Pantai',
-        district: 'Kec. Sijuk',
-        address: 'Desa Keciput, Kab. Belitung',
-        description: 'Pantai berpasir putih dengan batu granit.',
         ticketPrice: 0,
-        openingHours: '06.00 - 18.00 WIB',
-        facilities: ['Parkir Luas', 'Toilet'],
-        accessibilityVehicle: 'Motor, Mobil & Bus',
-        accessibilityNotes: 'Jalan beraspal mulus.',
-        imageUrl: 'https://example.com/pantai.jpg',
+        openHours: '07.00 - 18.00 WIB',
+        facilities: ['Parkir', 'Gazebo'],
+        description: 'Pantai pasir putih dekat kota.',
       ),
     ];
   }
+
+  @override
+  Future<Destination> createDestination(Destination destination) async {
+    return destination;
+  }
+
+  @override
+  Future<Destination> updateDestination(Destination destination) async {
+    return destination;
+  }
+
+  @override
+  Future<void> deleteDestination(String id) async {}
 }
 
 void main() {
@@ -37,16 +46,16 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Pantai Tanjung Tinggi'), findsOneWidget);
+    expect(find.text('Jelajah Wisata Lampung'), findsOneWidget);
+    expect(find.text('Pantai Pasir Putih Lampung'), findsOneWidget);
     expect(find.text('Gratis'), findsOneWidget);
 
-    await tester.tap(find.text('Pantai Tanjung Tinggi'));
+    await tester.tap(find.text('Pantai Pasir Putih Lampung'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Desa Keciput, Kab. Belitung'), findsOneWidget);
-    expect(find.text('06.00 - 18.00 WIB'), findsOneWidget);
-    expect(find.text('Parkir Luas'), findsOneWidget);
-    expect(find.text('Motor, Mobil & Bus'), findsOneWidget);
-    expect(find.text('Buka di Google Maps'), findsOneWidget);
+    expect(find.text('Bandar Lampung, Provinsi Lampung'), findsOneWidget);
+    expect(find.text('07.00 - 18.00 WIB'), findsOneWidget);
+    expect(find.text('Parkir'), findsOneWidget);
+    expect(find.text('Buka Rute di Google Maps'), findsOneWidget);
   });
 }

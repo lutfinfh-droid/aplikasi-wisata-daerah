@@ -4,6 +4,7 @@ import '../data/destination_repository.dart';
 import '../models/destination.dart';
 import '../state/destination_list_controller.dart';
 import '../widgets/destination_card.dart';
+import '../widgets/destination_form_dialog.dart';
 import 'destination_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -36,7 +37,27 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openDetail(Destination destination) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => DestinationDetailScreen(destination: destination),
+        builder: (_) => DestinationDetailScreen(
+          destination: destination,
+          onUpdate: (updated) => _controller.updateDestination(updated),
+          onDelete: (id) => _controller.deleteDestination(id),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAddDialog() async {
+    await showDialog<bool>(
+      context: context,
+      builder: (_) => DestinationFormDialog(
+        onSave: (newDest) async {
+          await _controller.addDestination(newDest);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Destinasi berhasil ditambahkan!')),
+            );
+          }
+        },
       ),
     );
   }
@@ -45,6 +66,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddDialog,
+        backgroundColor: const Color(0xFF0F766E),
+        foregroundColor: Colors.white,
+        elevation: 3,
+        icon: const Icon(Icons.add_location_alt_rounded),
+        label: const Text(
+          'Tambah Wisata',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
       body: AnimatedBuilder(
         animation: _controller,
         builder: (context, _) {
@@ -56,8 +88,9 @@ class _HomeScreenState extends State<HomeScreen> {
               slivers: [
                 SliverToBoxAdapter(child: _buildHeaderBanner()),
                 SliverToBoxAdapter(child: _buildRegencyFilterBar()),
+                SliverToBoxAdapter(child: _buildCategoryFilterBar()),
                 ..._buildBodySlivers(),
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                const SliverToBoxAdapter(child: SizedBox(height: 80)),
               ],
             ),
           );
@@ -95,7 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: const Icon(
                   Icons.explore_rounded,
                   color: Colors.white,
-                  size: 22,
+                  size: 24,
                 ),
               ),
               const SizedBox(width: 12),
@@ -143,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onChanged: _controller.setSearchQuery,
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
-                hintText: 'Cari nama wisata atau kabupaten...',
+                hintText: 'Cari nama wisata, kabupaten, atau kategori...',
                 hintStyle: const TextStyle(
                   color: Color(0xFF94A3B8),
                   fontSize: 14,
@@ -182,9 +215,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildRegencyFilterBar() {
     final regencies = _controller.availableRegencies;
     return SizedBox(
-      height: 58,
+      height: 56,
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         scrollDirection: Axis.horizontal,
         itemCount: regencies.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
@@ -210,6 +243,47 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCategoryFilterBar() {
+    final categories = DestinationListController.categories;
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        scrollDirection: Axis.horizontal,
+        itemCount: categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final cat = categories[index];
+          final selected = _controller.selectedCategory == cat;
+          return FilterChip(
+            label: Text(cat),
+            selected: selected,
+            onSelected: (_) => _controller.setCategory(cat),
+            showCheckmark: false,
+            selectedColor: const Color(0xFFCCFBF1),
+            backgroundColor: Colors.transparent,
+            side: BorderSide(
+              color: selected
+                  ? const Color(0xFF0F766E)
+                  : const Color(0xFFCBD5E1),
+            ),
+            labelStyle: TextStyle(
+              color: selected
+                  ? const Color(0xFF0F766E)
+                  : const Color(0xFF64748B),
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 12,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
           );
         },
@@ -295,7 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'Coba ubah kata kunci pencarian atau pilih wilayah lain.',
+                    'Coba ubah kata kunci pencarian atau pilih wilayah/kategori lain.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Color(0xFF64748B)),
                   ),
@@ -315,7 +389,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ];
     }
 
-    // Jika "Semua Wilayah" aktif, tampilkan dikelompokkan per Kabupaten/Kota
+    // Jika "Semua Wilayah" dipilih, kelompokkan destinasi per Kabupaten/Kota
     if (_controller.selectedRegency ==
         DestinationListController.allRegionsLabel) {
       final grouped = _controller.groupedDestinations;
@@ -348,7 +422,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return slivers;
     }
 
-    // Jika kabupaten tertentu dipilih, tampilkan daftar wisata kabupaten tersebut
+    // Jika kabupaten tertentu dipilih
     return [
       SliverToBoxAdapter(
         child: _RegencySectionHeader(
@@ -385,7 +459,7 @@ class _RegencySectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
       child: Row(
         children: [
           Container(
